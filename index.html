@@ -41,6 +41,27 @@
             z-index: 1000;
             cursor: pointer;
         }
+        /* Стиль для подписи */
+        .signature {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: rgba(255,255,255,0.6);
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            z-index: 1000;
+            pointer-events: none;
+            background: rgba(0,0,0,0.4);
+            padding: 4px;
+            width: fit-content;
+            margin: 0 auto;
+            border-radius: 20px;
+            backdrop-filter: blur(2px);
+            font-weight: normal;
+            letter-spacing: 0.5px;
+        }
         @keyframes shake {
             0% { transform: translate(0, 0); }
             10% { transform: translate(-2px, 2px); }
@@ -57,9 +78,10 @@
     </style>
 </head>
 <body>
-    <button id="music-control">🔊</button>
-    <audio id="bg-music" loop>
-        <source id="music-source" src="">
+    <button id="music-control">🔇</button>
+    <div class="signature">by Harya Team</div>
+    <audio id="bg-music" loop preload="auto">
+        <source id="music-source" src="music.mp3">
     </audio>
 
     <script>
@@ -78,6 +100,7 @@
         let labels = [];
         let animationId;
         let musicPlaying = false;
+        let autoPlayAttempted = false;
         
         // Создаем хаотичные надписи
         function createCrazyLabels() {
@@ -176,32 +199,77 @@
             }
         }
         
-        // Музыка
+        // Музыка с автовоспроизведением
         function setupMusic() {
             const audio = document.getElementById('bg-music');
             const btn = document.getElementById('music-control');
             
+            // Функция обновления иконки кнопки
+            function updateButtonIcon() {
+                if (musicPlaying) {
+                    btn.textContent = '🔊';
+                } else {
+                    btn.textContent = '🔇';
+                }
+            }
+            
+            // Функция запуска музыки (вызывается при попытке автовоспроизведения или по клику)
+            function startMusic() {
+                if (musicPlaying) return;
+                
+                audio.play().then(() => {
+                    musicPlaying = true;
+                    updateButtonIcon();
+                    console.log('Автовоспроизведение успешно');
+                }).catch(e => {
+                    console.log('Автовоспроизведение заблокировано браузером:', e);
+                    musicPlaying = false;
+                    updateButtonIcon();
+                    // Показываем подсказку пользователю
+                    btn.style.animation = 'shake 0.5s ease-in-out';
+                    setTimeout(() => { btn.style.animation = ''; }, 500);
+                });
+            }
+            
+            // Обработчик кнопки
             btn.addEventListener('click', () => {
                 if (musicPlaying) {
                     audio.pause();
-                    btn.textContent = '🔇';
                     musicPlaying = false;
+                    updateButtonIcon();
                 } else {
-                    audio.play().catch(e => console.log('Автовоспроизведение заблокировано'));
-                    btn.textContent = '🔊';
-                    musicPlaying = true;
+                    audio.play().then(() => {
+                        musicPlaying = true;
+                        updateButtonIcon();
+                    }).catch(e => {
+                        console.log('Не удалось воспроизвести:', e);
+                    });
                 }
             });
             
-            // Пытаемся загрузить MP3 (положите файл music.mp3 рядом с index.html)
-            fetch('music.mp3')
+            // Пытаемся воспроизвести сразу при загрузке страницы
+            startMusic();
+            
+            // Также пробуем при любом касании экрана (политика автовоспроизведения в мобильных браузерах)
+            const attemptAutoPlayOnTouch = () => {
+                if (!musicPlaying) {
+                    startMusic();
+                }
+                // Удаляем обработчик после первого касания, чтобы не мешать
+                document.removeEventListener('touchstart', attemptAutoPlayOnTouch);
+                document.removeEventListener('click', attemptAutoPlayOnTouch);
+            };
+            
+            document.addEventListener('touchstart', attemptAutoPlayOnTouch);
+            document.addEventListener('click', attemptAutoPlayOnTouch);
+            
+            // Проверяем наличие MP3 файла
+            fetch('music.mp3', { method: 'HEAD' })
                 .then(response => {
-                    if (response.ok) {
-                        document.getElementById('music-source').src = 'music.mp3';
-                        audio.load();
-                    } else {
+                    if (!response.ok) {
                         console.log('MP3 файл не найден, музыка не будет играть');
                         btn.style.display = 'none';
+                        musicPlaying = false;
                     }
                 })
                 .catch(() => {
