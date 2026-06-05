@@ -18,12 +18,23 @@
             position: fixed;
             width: 100%;
             height: 100%;
+            cursor: pointer;
+        }
+        /* Затемняющий слой-ловушка для кликов по всему экрану */
+        .click-catcher {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 999;
+            background: transparent;
         }
         .number {
             position: absolute;
             font-weight: bold;
             white-space: nowrap;
-            pointer-events: none;
+            pointer-events: none; /* Чтобы цифры не мешали кликам */
             text-shadow: 0 0 5px rgba(0,0,0,0.5);
             transition: all 0.05s linear;
         }
@@ -38,10 +49,11 @@
             width: 50px;
             height: 50px;
             font-size: 24px;
-            z-index: 1000;
+            z-index: 1001;
             cursor: pointer;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
         }
-        /* Стиль для подписи */
         .signature {
             position: fixed;
             bottom: 20px;
@@ -62,22 +74,12 @@
             font-weight: normal;
             letter-spacing: 0.5px;
         }
-        @keyframes shake {
-            0% { transform: translate(0, 0); }
-            10% { transform: translate(-2px, 2px); }
-            20% { transform: translate(2px, -2px); }
-            30% { transform: translate(-1px, -1px); }
-            40% { transform: translate(1px, 1px); }
-            50% { transform: translate(-2px, 0); }
-            60% { transform: translate(2px, -1px); }
-            70% { transform: translate(-1px, 2px); }
-            80% { transform: translate(1px, -2px); }
-            90% { transform: translate(-2px, 1px); }
-            100% { transform: translate(0, 0); }
-        }
     </style>
 </head>
 <body>
+    <!-- Прозрачный слой, который делает весь экран кликабельным -->
+    <div class="click-catcher" id="clickCatcher"></div>
+    
     <button id="music-control">🔇</button>
     <div class="signature">by Harya Team</div>
     <audio id="bg-music" loop preload="auto">
@@ -100,19 +102,16 @@
         let labels = [];
         let animationId;
         let musicPlaying = false;
-        let autoPlayAttempted = false;
         
-        // Создаем хаотичные надписи
         function createCrazyLabels() {
-            const numLabels = Math.floor(Math.random() * 20) + 20; // 20-40 надписей
-            
+            const numLabels = Math.floor(Math.random() * 20) + 20;
             for (let i = 0; i < numLabels; i++) {
                 createSingleLabel();
             }
         }
         
         function createSingleLabel() {
-            const size = Math.floor(Math.random() * 90) + 20; // 20-110px
+            const size = Math.floor(Math.random() * 90) + 20;
             const font = fonts[Math.floor(Math.random() * fonts.length)];
             const color = colors[Math.floor(Math.random() * colors.length)];
             
@@ -136,7 +135,6 @@
             });
         }
         
-        // Анимация движения
         function animate() {
             for (let label of labels) {
                 let x = parseFloat(label.element.style.left);
@@ -145,7 +143,6 @@
                 let newX = x + label.speedX;
                 let newY = y + label.speedY;
                 
-                // Отскок от границ
                 if (newX <= 0 || newX >= window.innerWidth - 100) {
                     label.speedX = -label.speedX;
                     randomizeLabel(label);
@@ -161,18 +158,15 @@
                 label.element.style.left = newX + 'px';
                 label.element.style.top = newY + 'px';
                 
-                // Случайное изменение (10% шанс)
                 if (Math.random() < 0.1) {
                     randomizeLabel(label);
                 }
             }
             
-            // Иногда добавляем новую надпись
             if (Math.random() < 0.1 && labels.length < 60) {
                 createSingleLabel();
             }
             
-            // Иногда удаляем старую
             if (Math.random() < 0.05 && labels.length > 15) {
                 const old = labels.shift();
                 old.element.remove();
@@ -192,93 +186,78 @@
             label.size = newSize;
             label.color = newColor;
             
-            // Иногда меняем направление
             if (Math.random() < 0.3) {
                 label.speedX = (Math.random() - 0.5) * 4;
                 label.speedY = (Math.random() - 0.5) * 4;
             }
         }
         
-        // Музыка с автовоспроизведением
         function setupMusic() {
             const audio = document.getElementById('bg-music');
             const btn = document.getElementById('music-control');
+            const clickCatcher = document.getElementById('clickCatcher');
             
-            // Функция обновления иконки кнопки
             function updateButtonIcon() {
-                if (musicPlaying) {
-                    btn.textContent = '🔊';
-                } else {
-                    btn.textContent = '🔇';
-                }
+                btn.textContent = musicPlaying ? '🔊' : '🔇';
             }
             
-            // Функция запуска музыки (вызывается при попытке автовоспроизведения или по клику)
             function startMusic() {
                 if (musicPlaying) return;
                 
-                audio.play().then(() => {
-                    musicPlaying = true;
-                    updateButtonIcon();
-                    console.log('Автовоспроизведение успешно');
-                }).catch(e => {
-                    console.log('Автовоспроизведение заблокировано браузером:', e);
-                    musicPlaying = false;
-                    updateButtonIcon();
-                    // Показываем подсказку пользователю
-                    btn.style.animation = 'shake 0.5s ease-in-out';
-                    setTimeout(() => { btn.style.animation = ''; }, 500);
-                });
-            }
-            
-            // Обработчик кнопки
-            btn.addEventListener('click', () => {
-                if (musicPlaying) {
-                    audio.pause();
-                    musicPlaying = false;
-                    updateButtonIcon();
-                } else {
-                    audio.play().then(() => {
+                audio.play()
+                    .then(() => {
                         musicPlaying = true;
                         updateButtonIcon();
-                    }).catch(e => {
-                        console.log('Не удалось воспроизвести:', e);
+                        console.log('Музыка запущена');
+                    })
+                    .catch(e => {
+                        console.log('Автовоспроизведение заблокировано:', e);
+                        musicPlaying = false;
+                        updateButtonIcon();
                     });
+            }
+            
+            function stopMusic() {
+                if (!musicPlaying) return;
+                audio.pause();
+                musicPlaying = false;
+                updateButtonIcon();
+            }
+            
+            // Обработчик для кнопки управления
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (musicPlaying) {
+                    stopMusic();
+                } else {
+                    startMusic();
                 }
             });
             
-            // Пытаемся воспроизвести сразу при загрузке страницы
-            startMusic();
-            
-            // Также пробуем при любом касании экрана (политика автовоспроизведения в мобильных браузерах)
-            const attemptAutoPlayOnTouch = () => {
+            // Обработчик для всего экрана (через прозрачный слой)
+            clickCatcher.addEventListener('click', () => {
                 if (!musicPlaying) {
                     startMusic();
                 }
-                // Удаляем обработчик после первого касания, чтобы не мешать
-                document.removeEventListener('touchstart', attemptAutoPlayOnTouch);
-                document.removeEventListener('click', attemptAutoPlayOnTouch);
-            };
+            });
             
-            document.addEventListener('touchstart', attemptAutoPlayOnTouch);
-            document.addEventListener('click', attemptAutoPlayOnTouch);
+            // Автовоспроизведение при загрузке
+            startMusic();
             
-            // Проверяем наличие MP3 файла
+            // Проверяем наличие MP3
             fetch('music.mp3', { method: 'HEAD' })
                 .then(response => {
                     if (!response.ok) {
-                        console.log('MP3 файл не найден, музыка не будет играть');
+                        console.log('MP3 не найден');
                         btn.style.display = 'none';
-                        musicPlaying = false;
                     }
                 })
                 .catch(() => {
-                    console.log('MP3 файл не найден');
+                    console.log('MP3 не найден');
                     btn.style.display = 'none';
                 });
         }
         
-        // Обработка изменения размера окна
         window.addEventListener('resize', () => {
             for (let label of labels) {
                 let x = parseFloat(label.element.style.left);
@@ -290,7 +269,6 @@
             }
         });
         
-        // Запуск
         createCrazyLabels();
         animate();
         setupMusic();
